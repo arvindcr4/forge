@@ -1,7 +1,7 @@
 <h1 align="center">⚒️ Forge: AI-Enhanced Terminal Development Environment</h1>
 <p align="center">A comprehensive coding agent that integrates AI capabilities with your development environment</p>
 
-<p align="center"><code>curl -fsSL https://forgecode.dev/cli | sh</code></p>
+<p align="center"><code>curl -fsSL https://raw.githubusercontent.com/arvindcr4/forge/main/install.sh | bash</code></p>
 
 [![CI Status](https://img.shields.io/github/actions/workflow/status/tailcallhq/forgecode/ci.yml?style=for-the-badge)](https://github.com/tailcallhq/forgecode/actions)
 [![GitHub Release](https://img.shields.io/github/v/release/tailcallhq/forgecode?style=for-the-badge)](https://github.com/tailcallhq/forgecode/releases)
@@ -57,8 +57,10 @@
 To get started with Forge, run the command below:
 
 ```bash
-curl -fsSL https://forgecode.dev/cli | sh
+curl -fsSL https://raw.githubusercontent.com/arvindcr4/forge/main/install.sh | bash
 ```
+
+This builds `forge` from source via `cargo install --git` and auto-installs the matching shell plugin (zsh or fish). Requires a Rust toolchain — install from https://rustup.rs if needed. Set `FORGE_NO_SHELL=1` to skip the shell-plugin step, or `FORGE_REF=<tag>` to pin to a specific tag/branch.
 
 On first run, Forge will guide you through setting up your AI provider credentials using the interactive login flow. Alternatively, you can configure providers beforehand:
 
@@ -1098,7 +1100,7 @@ For comprehensive documentation on all features and capabilities, please visit t
 
 ```bash
 # YOLO
-curl -fsSL https://forgecode.dev/cli | sh
+curl -fsSL https://raw.githubusercontent.com/arvindcr4/forge/main/install.sh | bash
 
 # Package managers
 nix run github:tailcallhq/forgecode # for latest dev branch
