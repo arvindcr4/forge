@@ -53,6 +53,7 @@ mod transformer;
 mod update;
 mod validation;
 mod workspace;
+mod workflow_foundation;
 mod xml;
 
 pub use agent::*;
@@ -108,6 +109,7 @@ pub use transformer::*;
 pub use update::*;
 pub use validation::*;
 pub use workspace::*;
+pub use workflow_foundation::*;
 pub use xml::*;
 pub mod line_numbers;
 pub use auth::*;
