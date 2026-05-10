@@ -546,6 +546,47 @@ impl<A: API + ConsoleWriter + 'static, F: Fn(ForgeConfig) -> A + Send + Sync> UI
                 }
                 return Ok(());
             }
+            TopLevelCommand::Fish(terminal_group) => {
+                match terminal_group {
+                    crate::cli::FishCommandGroup::Plugin => {
+                        println!("{}", crate::shell_plugin::generate_fish_plugin());
+                    }
+                    crate::cli::FishCommandGroup::Theme => {
+                        println!("{}", crate::shell_plugin::generate_fish_theme());
+                    }
+                    crate::cli::FishCommandGroup::PluginPath => {
+                        println!("{}", crate::shell_plugin::fish_plugin_path()?.display());
+                    }
+                    crate::cli::FishCommandGroup::Doctor => {
+                        self.spinner.stop(None)?;
+                        crate::shell_plugin::run_fish_doctor()?;
+                    }
+                    crate::cli::FishCommandGroup::Keyboard => {
+                        self.spinner.stop(None)?;
+                        crate::shell_plugin::run_fish_keyboard()?;
+                    }
+                }
+                return Ok(());
+            }
+            TopLevelCommand::Pwsh(terminal_group) => {
+                match terminal_group {
+                    crate::cli::PwshCommandGroup::Plugin => {
+                        println!("{}", crate::shell_plugin::generate_pwsh_plugin());
+                    }
+                    crate::cli::PwshCommandGroup::Theme => {
+                        println!("{}", crate::shell_plugin::generate_pwsh_theme());
+                    }
+                    crate::cli::PwshCommandGroup::Doctor => {
+                        self.spinner.stop(None)?;
+                        crate::shell_plugin::run_pwsh_doctor()?;
+                    }
+                    crate::cli::PwshCommandGroup::Keyboard => {
+                        self.spinner.stop(None)?;
+                        crate::shell_plugin::run_pwsh_keyboard()?;
+                    }
+                }
+                return Ok(());
+            }
             TopLevelCommand::Mcp(mcp_command) => match mcp_command.command {
                 McpCommand::Import(import_args) => {
                     let scope: forge_domain::Scope = import_args.scope.into();

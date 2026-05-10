@@ -14,6 +14,7 @@ mod oauth_callback;
 mod porcelain;
 mod prompt;
 mod sandbox;
+mod shell_plugin;
 mod state;
 mod stream_renderer;
 mod sync_display;

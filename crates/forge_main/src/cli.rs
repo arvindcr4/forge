@@ -86,6 +86,14 @@ pub enum TopLevelCommand {
     #[command(subcommand, alias = "extension")]
     Zsh(ZshCommandGroup),
 
+    /// Generate Fish shell extension scripts.
+    #[command(subcommand)]
+    Fish(FishCommandGroup),
+
+    /// Generate PowerShell extension scripts.
+    #[command(subcommand)]
+    Pwsh(PwshCommandGroup),
+
     /// List agents, models, providers, tools, or MCP servers.
     List(ListCommandGroup),
 
@@ -505,6 +513,41 @@ pub enum ZshCommandGroup {
         #[arg(long)]
         buffer: String,
     },
+}
+
+/// Fish shell extension commands.
+#[derive(Subcommand, Debug, Clone)]
+pub enum FishCommandGroup {
+    /// Generate Fish shell plugin script.
+    Plugin,
+
+    /// Generate Fish shell theme.
+    Theme,
+
+    /// Print the installed Fish plugin path used by setup scripts.
+    PluginPath,
+
+    /// Run diagnostics on Fish shell environment.
+    Doctor,
+
+    /// Show keyboard shortcuts for Fish shell.
+    Keyboard,
+}
+
+/// PowerShell extension commands.
+#[derive(Subcommand, Debug, Clone)]
+pub enum PwshCommandGroup {
+    /// Generate PowerShell plugin script.
+    Plugin,
+
+    /// Generate PowerShell theme.
+    Theme,
+
+    /// Run diagnostics on PowerShell environment.
+    Doctor,
+
+    /// Show keyboard shortcuts for PowerShell.
+    Keyboard,
 }
 
 /// Command group for MCP server management.
@@ -1918,6 +1961,114 @@ mod tests {
         let actual = match fixture.subcommands {
             Some(TopLevelCommand::Zsh(ZshCommandGroup::Format { buffer })) => {
                 buffer == "hello world"
+            }
+            _ => false,
+        };
+        assert_eq!(actual, true);
+    }
+
+    #[test]
+    fn test_fish_plugin() {
+        let fixture = Cli::parse_from(["forge", "fish", "plugin"]);
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Fish(terminal)) => {
+                matches!(terminal, FishCommandGroup::Plugin)
+            }
+            _ => false,
+        };
+        assert_eq!(actual, true);
+    }
+
+    #[test]
+    fn test_fish_theme() {
+        let fixture = Cli::parse_from(["forge", "fish", "theme"]);
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Fish(terminal)) => {
+                matches!(terminal, FishCommandGroup::Theme)
+            }
+            _ => false,
+        };
+        assert_eq!(actual, true);
+    }
+
+    #[test]
+    fn test_fish_plugin_path() {
+        let fixture = Cli::parse_from(["forge", "fish", "plugin-path"]);
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Fish(terminal)) => {
+                matches!(terminal, FishCommandGroup::PluginPath)
+            }
+            _ => false,
+        };
+        assert_eq!(actual, true);
+    }
+
+    #[test]
+    fn test_fish_doctor() {
+        let fixture = Cli::parse_from(["forge", "fish", "doctor"]);
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Fish(terminal)) => {
+                matches!(terminal, FishCommandGroup::Doctor)
+            }
+            _ => false,
+        };
+        assert_eq!(actual, true);
+    }
+
+    #[test]
+    fn test_fish_keyboard() {
+        let fixture = Cli::parse_from(["forge", "fish", "keyboard"]);
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Fish(terminal)) => {
+                matches!(terminal, FishCommandGroup::Keyboard)
+            }
+            _ => false,
+        };
+        assert_eq!(actual, true);
+    }
+
+    #[test]
+    fn test_pwsh_plugin() {
+        let fixture = Cli::parse_from(["forge", "pwsh", "plugin"]);
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Pwsh(terminal)) => {
+                matches!(terminal, PwshCommandGroup::Plugin)
+            }
+            _ => false,
+        };
+        assert_eq!(actual, true);
+    }
+
+    #[test]
+    fn test_pwsh_theme() {
+        let fixture = Cli::parse_from(["forge", "pwsh", "theme"]);
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Pwsh(terminal)) => {
+                matches!(terminal, PwshCommandGroup::Theme)
+            }
+            _ => false,
+        };
+        assert_eq!(actual, true);
+    }
+
+    #[test]
+    fn test_pwsh_doctor() {
+        let fixture = Cli::parse_from(["forge", "pwsh", "doctor"]);
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Pwsh(terminal)) => {
+                matches!(terminal, PwshCommandGroup::Doctor)
+            }
+            _ => false,
+        };
+        assert_eq!(actual, true);
+    }
+
+    #[test]
+    fn test_pwsh_keyboard() {
+        let fixture = Cli::parse_from(["forge", "pwsh", "keyboard"]);
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Pwsh(terminal)) => {
+                matches!(terminal, PwshCommandGroup::Keyboard)
             }
             _ => false,
         };
