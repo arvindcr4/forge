@@ -256,6 +256,15 @@ function forge-accept-line() {
         workspace-info|sync-info)
             _forge_action_sync_info
         ;;
+        mcp)
+            _forge_action_mcp "$input_text"
+        ;;
+        scan)
+            _forge_action_scan
+        ;;
+        memory)
+            _forge_action_memory "$input_text"
+        ;;
         provider-login|login|provider)
             _forge_action_login "$input_text"
         ;;

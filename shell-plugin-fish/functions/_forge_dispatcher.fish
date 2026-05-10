@@ -80,6 +80,12 @@ function forge_dispatch
             _forge_action_sync_status
         case workspace-info sync-info
             _forge_action_sync_info
+        case mcp
+            _forge_action_mcp "$input_text"
+        case scan
+            _forge_action_scan
+        case memory
+            _forge_action_memory "$input_text"
         case provider-login login provider
             _forge_action_login "$input_text"
         case logout

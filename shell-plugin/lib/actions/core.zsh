@@ -67,6 +67,38 @@ function _forge_action_help() {
     $_FORGE_BIN list command
 }
 
+# Action handler: MCP shortcuts
+function _forge_action_mcp() {
+    local input_text="$1"
+
+    echo
+    if [[ "$input_text" == "doctor" ]]; then
+        _forge_exec mcp doctor
+    else
+        _forge_exec mcp ${(z)input_text}
+    fi
+}
+
+# Action handler: Project scan shortcut
+function _forge_action_scan() {
+    echo
+    _forge_exec project scan
+}
+
+# Action handler: Memory shortcuts
+function _forge_action_memory() {
+    local input_text="$1"
+
+    echo
+    if [[ -z "$input_text" ]]; then
+        _forge_exec memory list
+    elif [[ "$input_text" == add\ * ]]; then
+        _forge_exec memory add "${input_text#add }"
+    else
+        _forge_exec memory ${(z)input_text}
+    fi
+}
+
 # Helper function to handle conversation commands that require an active conversation
 function _forge_handle_conversation_command() {
     local subcommand="$1"

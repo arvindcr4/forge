@@ -49,6 +49,9 @@ function script:Invoke-ForgeDispatch {
         { $_ -in "workspace-init", "sync-init" }                 { Invoke-ForgeActionSyncInit }
         { $_ -in "workspace-status", "sync-status" }             { Invoke-ForgeActionSyncStatus }
         { $_ -in "workspace-info", "sync-info" }                 { Invoke-ForgeActionSyncInfo }
+        "mcp"                                                    { Invoke-ForgeActionMcp $inputText }
+        "scan"                                                   { Invoke-ForgeActionScan }
+        "memory"                                                 { Invoke-ForgeActionMemory $inputText }
         { $_ -in "provider-login", "login", "provider" }         { Invoke-ForgeActionLogin $inputText }
         "logout"                                                 { Invoke-ForgeActionLogout $inputText }
         "doctor"                                                 { Invoke-ForgeActionDoctor }
