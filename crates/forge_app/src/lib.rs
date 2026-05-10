@@ -37,6 +37,7 @@ mod user;
 pub mod user_prompt;
 pub mod utils;
 mod walker;
+mod workflow_foundation;
 mod workspace_status;
 
 pub use agent::*;
@@ -54,6 +55,7 @@ pub use tool_resolver::*;
 pub use user::*;
 pub use utils::{compute_hash, is_binary_content_type};
 pub use walker::*;
+pub use workflow_foundation::*;
 pub use workspace_status::*;
 pub mod domain {
     pub use forge_domain::*;
