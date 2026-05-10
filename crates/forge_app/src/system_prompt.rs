@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use derive_setters::Setters;
 use forge_domain::{
-    Agent, Conversation, Environment, Extension, ExtensionStat, File, Model, SystemContext,
-    Template, TemplateConfig, ToolCatalog, ToolDefinition, ToolUsagePrompt,
+    Agent, Conversation, Environment, Extension, ExtensionStat, File, MemoryEntry, Model,
+    SystemContext, Template, TemplateConfig, ToolCatalog, ToolDefinition, ToolUsagePrompt,
 };
 use serde_json::{Map, Value, json};
 use strum::IntoEnumIterator;
@@ -21,6 +21,7 @@ pub struct SystemPrompt<S> {
     files: Vec<File>,
     models: Vec<Model>,
     custom_instructions: Vec<String>,
+    memory_entries: Vec<MemoryEntry>,
     /// Maximum number of file extensions shown in the workspace summary.
     max_extensions: usize,
     /// Configuration values passed into tool description templates.
@@ -37,6 +38,7 @@ impl<S: SkillFetchService + ShellService> SystemPrompt<S> {
             tool_definitions: Vec::default(),
             files: Vec::default(),
             custom_instructions: Vec::default(),
+            memory_entries: Vec::default(),
             max_extensions: 0,
             template_config: TemplateConfig::default(),
         }
@@ -91,6 +93,11 @@ impl<S: SkillFetchService + ShellService> SystemPrompt<S> {
             self.custom_instructions.iter().for_each(|rule| {
                 custom_rules.push(rule.as_str());
             });
+
+            let memory_block = render_memory_rules(&self.memory_entries);
+            if !memory_block.is_empty() {
+                custom_rules.push(&memory_block);
+            }
 
             let skills = self.services.list_skills().await?;
 
@@ -245,6 +252,26 @@ fn parse_extensions(extensions: &str, max_extensions: usize) -> Option<Extension
     })
 }
 
+fn render_memory_rules(entries: &[MemoryEntry]) -> String {
+    if entries.is_empty() {
+        return String::new();
+    }
+
+    let notes = entries
+        .iter()
+        .map(|entry| {
+            if entry.tags.is_empty() {
+                format!("- {}", entry.text)
+            } else {
+                format!("- {} [{}]", entry.text, entry.tags.join(", "))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    format!("Repo memory:\n{notes}")
+}
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
@@ -271,6 +298,21 @@ mod tests {
             4,
             "0",
         );
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn render_memory_rules_formats_repo_memory() {
+        let fixture = vec![
+            MemoryEntry::new("Use cargo check before commits").tags(vec!["build".to_string()]),
+            MemoryEntry::new("Keep shell plugins in sync"),
+        ];
+
+        let actual = render_memory_rules(&fixture);
+        let expected =
+            "Repo memory:\n- Use cargo check before commits [build]\n- Keep shell plugins in sync"
+                .to_string();
 
         assert_eq!(actual, expected);
     }

@@ -2,11 +2,12 @@ use std::env;
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use anyhow::Context;
 use forge_domain::{
-    McpConfig, McpDoctorFinding, McpDoctorReport, McpDoctorSeverity, McpServerConfig, MemoryEntry,
-    MemoryStore, ProjectCommandCandidate, ProjectProfile,
+    McpConfig, McpDoctorFinding, McpDoctorReport, McpDoctorSeverity, McpOAuthSetting,
+    McpServerConfig, MemoryEntry, MemoryStore, ProjectCommandCandidate, ProjectProfile,
 };
 
 /// Diagnoses MCP server configuration without mutating it.
@@ -78,11 +79,97 @@ impl McpDoctorService {
                             format!("invalid url: {}", http.url),
                         ));
                     }
+
+                    if let McpOAuthSetting::Configured(oauth) = &http.oauth {
+                        for (label, value) in [
+                            ("auth_url", oauth.auth_url.as_ref()),
+                            ("token_url", oauth.token_url.as_ref()),
+                            ("redirect_uri", oauth.redirect_uri.as_ref()),
+                        ] {
+                            if let Some(value) = value
+                                && url::Url::parse(value).is_err()
+                            {
+                                findings.push(McpDoctorFinding::new(
+                                    name.to_string(),
+                                    McpDoctorSeverity::Error,
+                                    format!("invalid OAuth {label}: {value}"),
+                                ));
+                            }
+                        }
+                    }
                 }
             }
         }
 
         McpDoctorReport::new(findings)
+    }
+
+    /// Checks an MCP config and performs HTTP reachability checks.
+    ///
+    /// # Arguments
+    /// * `config` - Effective MCP configuration to validate.
+    ///
+    /// # Errors
+    /// Returns an error when the HTTP client cannot be constructed.
+    pub async fn check_config_with_network(
+        &self,
+        config: &McpConfig,
+    ) -> anyhow::Result<McpDoctorReport> {
+        let mut findings = self.check_config(config).findings;
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .redirect(reqwest::redirect::Policy::limited(3))
+            .build()
+            .context("failed to build MCP doctor HTTP client")?;
+
+        for (name, server) in &config.mcp_servers {
+            let McpServerConfig::Http(http) = server else {
+                continue;
+            };
+            if http.disable || url::Url::parse(&http.url).is_err() {
+                continue;
+            }
+
+            match client.get(&http.url).send().await {
+                Ok(response)
+                    if response.status().is_success() || response.status().is_redirection() =>
+                {
+                    findings.push(McpDoctorFinding::new(
+                        name.to_string(),
+                        McpDoctorSeverity::Info,
+                        "network reachable",
+                    ));
+                }
+                Ok(response)
+                    if response.status().as_u16() == 401 || response.status().as_u16() == 403 =>
+                {
+                    findings.push(McpDoctorFinding::new(
+                        name.to_string(),
+                        McpDoctorSeverity::Warning,
+                        format!(
+                            "network reachable but authentication returned {}",
+                            response.status()
+                        ),
+                    ));
+                }
+                Ok(response) => {
+                    findings.push(McpDoctorFinding::new(
+                        name.to_string(),
+                        McpDoctorSeverity::Warning,
+                        format!("network returned {}", response.status()),
+                    ));
+                }
+                Err(error) => {
+                    findings.push(McpDoctorFinding::new(
+                        name.to_string(),
+                        McpDoctorSeverity::Warning,
+                        format!("network unreachable: {error}"),
+                    ));
+                }
+            }
+        }
+
+        Ok(McpDoctorReport::new(findings))
     }
 }
 
@@ -147,7 +234,14 @@ impl ProjectScanService {
 
         if root.join("package.json").exists() {
             push_unique(&mut languages, "JavaScript");
+            if package_managers.is_empty() {
+                package_managers.push("npm".to_string());
+            }
             config_files.push("package.json".to_string());
+            commands.extend(read_package_json_scripts(
+                root,
+                preferred_node_runner(&package_managers),
+            ));
         }
 
         let default_branch = detect_default_branch(root);
@@ -317,6 +411,58 @@ fn project_profile_path(root: &Path) -> PathBuf {
     root.join(".forge").join("project-profile.json")
 }
 
+fn preferred_node_runner(package_managers: &[String]) -> &'static str {
+    if package_managers.iter().any(|manager| manager == "pnpm") {
+        "pnpm"
+    } else if package_managers.iter().any(|manager| manager == "yarn") {
+        "yarn"
+    } else {
+        "npm"
+    }
+}
+
+fn read_package_json_scripts(root: &Path, runner: &str) -> Vec<ProjectCommandCandidate> {
+    let Ok(content) = fs::read_to_string(root.join("package.json")) else {
+        return Vec::new();
+    };
+    let Ok(package) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return Vec::new();
+    };
+    let Some(scripts) = package.get("scripts").and_then(|value| value.as_object()) else {
+        return Vec::new();
+    };
+
+    let mut commands = scripts
+        .keys()
+        .filter(|script| {
+            matches!(
+                script.as_str(),
+                "build" | "check" | "format" | "lint" | "test"
+            )
+        })
+        .map(|script| {
+            ProjectCommandCandidate::new(
+                script.as_str(),
+                format!("{runner} run {script}"),
+                "package.json",
+            )
+        })
+        .collect::<Vec<_>>();
+    commands.sort_by_key(|command| script_priority(&command.kind));
+    commands
+}
+
+fn script_priority(kind: &str) -> usize {
+    match kind {
+        "build" => 0,
+        "test" => 1,
+        "check" => 2,
+        "lint" => 3,
+        "format" => 4,
+        _ => usize::MAX,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -341,6 +487,53 @@ mod tests {
         assert_eq!(actual.has_errors(), true);
     }
 
+    #[tokio::test]
+    async fn mcp_doctor_network_reports_reachable_http_server() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            tokio::io::AsyncWriteExt::write_all(
+                &mut socket,
+                b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+            )
+            .await
+            .unwrap();
+        });
+        let fixture = McpConfig::from(BTreeMap::from([(
+            ServerName::from("reachable".to_string()),
+            McpServerConfig::new_http(format!("http://{addr}/mcp")),
+        )]));
+
+        let actual = McpDoctorService::new()
+            .check_config_with_network(&fixture)
+            .await
+            .unwrap();
+        handle.await.unwrap();
+        let expected = McpDoctorReport::new(vec![McpDoctorFinding::new(
+            "reachable",
+            McpDoctorSeverity::Info,
+            "network reachable",
+        )]);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[tokio::test]
+    async fn mcp_doctor_network_reports_unreachable_http_server() {
+        let fixture = McpConfig::from(BTreeMap::from([(
+            ServerName::from("unreachable".to_string()),
+            McpServerConfig::new_http("http://127.0.0.1:9/mcp"),
+        )]));
+
+        let actual = McpDoctorService::new()
+            .check_config_with_network(&fixture)
+            .await
+            .unwrap();
+
+        assert_eq!(actual.has_warnings_or_errors(), true);
+    }
+
     #[test]
     fn project_scan_detects_rust_and_node_project() {
         let temp = tempfile::tempdir().unwrap();
@@ -359,6 +552,27 @@ mod tests {
             actual.package_managers,
             vec!["cargo".to_string(), "npm".to_string()]
         );
+    }
+
+    #[test]
+    fn project_scan_detects_package_json_scripts() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            temp.path().join("package.json"),
+            r#"{"scripts":{"build":"vite build","test":"vitest","lint":"eslint ."}}"#,
+        )
+        .unwrap();
+
+        let actual = ProjectScanService::new()
+            .scan(temp.path(), Vec::new())
+            .unwrap();
+        let expected = vec![
+            ProjectCommandCandidate::new("build", "npm run build", "package.json"),
+            ProjectCommandCandidate::new("test", "npm run test", "package.json"),
+            ProjectCommandCandidate::new("lint", "npm run lint", "package.json"),
+        ];
+
+        assert_eq!(actual.commands, expected);
     }
 
     #[test]

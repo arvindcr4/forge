@@ -228,9 +228,15 @@ impl<
             .map_err(|e| anyhow::anyhow!(e))
     }
 
-    async fn mcp_doctor(&self) -> Result<McpDoctorReport> {
+    async fn mcp_doctor(&self, network: bool) -> Result<McpDoctorReport> {
         let config = self.services.read_mcp_config(None).await?;
-        Ok(McpDoctorService::new().check_config(&config))
+        if network {
+            McpDoctorService::new()
+                .check_config_with_network(&config)
+                .await
+        } else {
+            Ok(McpDoctorService::new().check_config(&config))
+        }
     }
 
     async fn scan_project(&self, write: bool) -> Result<ProjectProfile> {

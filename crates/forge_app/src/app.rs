@@ -23,7 +23,7 @@ use crate::tool_resolver::ToolResolver;
 use crate::user_prompt::UserPromptGenerator;
 use crate::{
     AgentExt, AgentProviderResolver, ConversationService, EnvironmentInfra, FileDiscoveryService,
-    ProviderService, Services,
+    MemoryService, ProviderService, Services,
 };
 
 /// Builds a [`TemplateConfig`] from a [`ForgeConfig`].
@@ -77,6 +77,9 @@ impl<S: Services + EnvironmentInfra<Config = forge_config::ForgeConfig>> ForgeAp
         let files = services.list_current_directory().await?;
 
         let custom_instructions = services.get_custom_instructions().await;
+        let memory_entries = MemoryService::new(environment.cwd.clone())
+            .list()
+            .unwrap_or_default();
 
         // Prepare agents with user configuration
         let agent_provider_resolver = AgentProviderResolver::new(services.clone());
@@ -117,6 +120,7 @@ impl<S: Services + EnvironmentInfra<Config = forge_config::ForgeConfig>> ForgeAp
             SystemPrompt::new(self.services.clone(), environment.clone(), agent.clone())
                 .custom_instructions(custom_instructions.clone())
                 .tool_definitions(tool_definitions.clone())
+                .memory_entries(memory_entries)
                 .models(models.clone())
                 .files(files.clone())
                 .max_extensions(forge_config.max_extensions)

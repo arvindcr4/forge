@@ -125,7 +125,7 @@ pub trait API: Sync + Send {
     async fn write_mcp_config(&self, scope: &Scope, config: &McpConfig) -> Result<()>;
 
     /// Diagnoses the effective MCP configuration without mutating it.
-    async fn mcp_doctor(&self) -> Result<McpDoctorReport>;
+    async fn mcp_doctor(&self, network: bool) -> Result<McpDoctorReport>;
 
     /// Scans the current workspace and optionally persists the profile.
     async fn scan_project(&self, write: bool) -> Result<ProjectProfile>;

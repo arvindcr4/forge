@@ -589,7 +589,7 @@ impl<A: API + ConsoleWriter + 'static, F: Fn(ForgeConfig) -> A + Send + Sync> UI
             }
             TopLevelCommand::Mcp(mcp_command) => match mcp_command.command {
                 McpCommand::Doctor(args) => {
-                    let report = self.api.mcp_doctor().await?;
+                    let report = self.api.mcp_doctor(args.network).await?;
                     if args.json {
                         println!("{}", serde_json::to_string_pretty(&report)?);
                     } else if report.findings.is_empty() {
