@@ -124,6 +124,27 @@ pub trait API: Sync + Send {
     /// project directory
     async fn write_mcp_config(&self, scope: &Scope, config: &McpConfig) -> Result<()>;
 
+    /// Diagnoses the effective MCP configuration without mutating it.
+    async fn mcp_doctor(&self) -> Result<McpDoctorReport>;
+
+    /// Scans the current workspace and optionally persists the profile.
+    async fn scan_project(&self, write: bool) -> Result<ProjectProfile>;
+
+    /// Reads the stored project profile for the current workspace.
+    async fn read_project_profile(&self) -> Result<Option<ProjectProfile>>;
+
+    /// Adds a repo-scoped memory entry.
+    async fn add_memory(&self, text: String, tags: Vec<String>) -> Result<MemoryEntry>;
+
+    /// Lists repo-scoped memory entries.
+    async fn list_memory(&self) -> Result<Vec<MemoryEntry>>;
+
+    /// Removes a repo-scoped memory entry by ID.
+    async fn remove_memory(&self, id: &str) -> Result<bool>;
+
+    /// Clears all repo-scoped memory entries.
+    async fn clear_memory(&self) -> Result<()>;
+
     /// Retrieves the provider configuration for the specified agent
     async fn get_agent_provider(&self, agent_id: AgentId) -> anyhow::Result<Provider<Url>>;
 

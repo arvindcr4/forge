@@ -162,6 +162,44 @@ impl ProjectScanService {
             mcp_servers,
         })
     }
+
+    /// Reads a stored project profile.
+    ///
+    /// # Arguments
+    /// * `root` - Workspace root.
+    pub fn read_profile(&self, root: &Path) -> anyhow::Result<Option<ProjectProfile>> {
+        let path = project_profile_path(root);
+        if !path.exists() {
+            return Ok(None);
+        }
+
+        let content = fs::read_to_string(&path)
+            .with_context(|| format!("failed to read project profile {}", path.display()))?;
+        let profile = serde_json::from_str(&content)
+            .with_context(|| format!("failed to parse project profile {}", path.display()))?;
+        Ok(Some(profile))
+    }
+
+    /// Writes a project profile atomically.
+    ///
+    /// # Arguments
+    /// * `root` - Workspace root.
+    /// * `profile` - Profile to persist.
+    pub fn write_profile(&self, root: &Path, profile: &ProjectProfile) -> anyhow::Result<()> {
+        let path = project_profile_path(root);
+        let parent = path
+            .parent()
+            .context("project profile path should always have parent directory")?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+        let tmp_path = path.with_extension("json.tmp");
+        let content = serde_json::to_string_pretty(profile)?;
+        fs::write(&tmp_path, content)
+            .with_context(|| format!("failed to write {}", tmp_path.display()))?;
+        fs::rename(&tmp_path, &path)
+            .with_context(|| format!("failed to move project profile to {}", path.display()))?;
+        Ok(())
+    }
 }
 
 impl Default for ProjectScanService {
@@ -275,6 +313,10 @@ fn detect_default_branch(root: &Path) -> Option<String> {
         .map(ToString::to_string)
 }
 
+fn project_profile_path(root: &Path) -> PathBuf {
+    root.join(".forge").join("project-profile.json")
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -309,6 +351,23 @@ mod tests {
 
         assert_eq!(actual.languages, vec!["Rust".to_string(), "JavaScript".to_string()]);
         assert_eq!(actual.package_managers, vec!["cargo".to_string(), "npm".to_string()]);
+    }
+
+    #[test]
+    fn project_scan_writes_and_reads_profile() {
+        let temp = tempfile::tempdir().unwrap();
+        let fixture = ProjectScanService::new();
+        let profile = ProjectProfile {
+            root: temp.path().display().to_string(),
+            languages: vec!["Rust".to_string()],
+            ..Default::default()
+        };
+
+        fixture.write_profile(temp.path(), &profile).unwrap();
+        let actual = fixture.read_profile(temp.path()).unwrap();
+        let expected = Some(profile);
+
+        assert_eq!(actual, expected);
     }
 
     #[test]

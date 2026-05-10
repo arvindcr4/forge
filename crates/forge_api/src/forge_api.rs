@@ -7,8 +7,9 @@ use forge_app::dto::ToolsOverview;
 use forge_app::{
     AgentProviderResolver, AgentRegistry, AppConfigService, AuthService, CommandInfra,
     CommandLoaderService, ConversationService, DataGenerationApp, EnvironmentInfra,
-    FileDiscoveryService, ForgeApp, GitApp, GrpcInfra, McpConfigManager, McpService,
-    ProviderAuthService, ProviderService, Services, User, UserUsage, Walker, WorkspaceService,
+    FileDiscoveryService, ForgeApp, GitApp, GrpcInfra, McpConfigManager, McpDoctorService,
+    McpService, MemoryService, ProjectScanService, ProviderAuthService, ProviderService, Services,
+    User, UserUsage, Walker, WorkspaceService,
 };
 use forge_config::ForgeConfig;
 use forge_domain::{Agent, ConsoleWriter, *};
@@ -225,6 +226,48 @@ impl<
             .write_mcp_config(config, scope)
             .await
             .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn mcp_doctor(&self) -> Result<McpDoctorReport> {
+        let config = self.services.read_mcp_config(None).await?;
+        Ok(McpDoctorService::new().check_config(&config))
+    }
+
+    async fn scan_project(&self, write: bool) -> Result<ProjectProfile> {
+        let environment = self.environment();
+        let config = self.services.read_mcp_config(None).await?;
+        let mcp_servers = config.mcp_servers.keys().map(ToString::to_string).collect();
+        let service = ProjectScanService::new();
+        let profile = service.scan(&environment.cwd, mcp_servers)?;
+        if write {
+            service.write_profile(&environment.cwd, &profile)?;
+        }
+        Ok(profile)
+    }
+
+    async fn read_project_profile(&self) -> Result<Option<ProjectProfile>> {
+        let environment = self.environment();
+        ProjectScanService::new().read_profile(&environment.cwd)
+    }
+
+    async fn add_memory(&self, text: String, tags: Vec<String>) -> Result<MemoryEntry> {
+        let environment = self.environment();
+        MemoryService::new(environment.cwd).add(text, tags)
+    }
+
+    async fn list_memory(&self) -> Result<Vec<MemoryEntry>> {
+        let environment = self.environment();
+        MemoryService::new(environment.cwd).list()
+    }
+
+    async fn remove_memory(&self, id: &str) -> Result<bool> {
+        let environment = self.environment();
+        MemoryService::new(environment.cwd).remove(id)
+    }
+
+    async fn clear_memory(&self) -> Result<()> {
+        let environment = self.environment();
+        MemoryService::new(environment.cwd).clear()
     }
 
     async fn execute_shell_command_raw(
