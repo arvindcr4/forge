@@ -124,6 +124,12 @@ pub enum TopLevelCommand {
     /// Manage Model Context Protocol servers.
     Mcp(McpCommandGroup),
 
+    /// Scan and inspect the current project.
+    Project(ProjectCommandGroup),
+
+    /// Manage repo-scoped memory notes.
+    Memory(MemoryCommandGroup),
+
     /// Suggest shell commands from natural language.
     Suggest {
         /// Natural language description of the desired command.
@@ -314,6 +320,78 @@ pub enum AgentCommand {
 pub struct WorkspaceCommandGroup {
     #[command(subcommand)]
     pub command: WorkspaceCommand,
+}
+
+/// Command group for `forge project`.
+#[derive(Parser, Debug, Clone)]
+pub struct ProjectCommandGroup {
+    #[command(subcommand)]
+    pub command: ProjectCommand,
+}
+
+/// Project inspection commands.
+#[derive(Subcommand, Debug, Clone)]
+pub enum ProjectCommand {
+    /// Scan the current workspace and build a deterministic profile.
+    Scan(ProjectScanArgs),
+}
+
+/// Arguments for `forge project scan`.
+#[derive(Parser, Debug, Clone)]
+pub struct ProjectScanArgs {
+    /// Print the detected profile without writing it.
+    #[arg(long)]
+    pub print: bool,
+
+    /// Overwrite the stored profile.
+    #[arg(long)]
+    pub refresh: bool,
+
+    /// Output in machine-readable format.
+    #[arg(long)]
+    pub json: bool,
+}
+
+/// Command group for `forge memory`.
+#[derive(Parser, Debug, Clone)]
+pub struct MemoryCommandGroup {
+    #[command(subcommand)]
+    pub command: MemoryCommand,
+}
+
+/// Repo-scoped memory commands.
+#[derive(Subcommand, Debug, Clone)]
+pub enum MemoryCommand {
+    /// Add a repo-scoped memory note.
+    Add(MemoryAddArgs),
+
+    /// List repo-scoped memory notes.
+    List {
+        /// Output in machine-readable format.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Remove a repo-scoped memory note by ID.
+    Remove {
+        /// Memory entry ID to remove.
+        id: String,
+    },
+
+    /// Remove all repo-scoped memory notes.
+    Clear,
+}
+
+/// Arguments for `forge memory add`.
+#[derive(Parser, Debug, Clone)]
+pub struct MemoryAddArgs {
+    /// Memory note text.
+    #[arg(allow_hyphen_values = true)]
+    pub text: String,
+
+    /// Tag to attach to the memory entry.
+    #[arg(long = "tag")]
+    pub tags: Vec<String>,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -563,6 +641,9 @@ pub struct McpCommandGroup {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum McpCommand {
+    /// Diagnose configured MCP servers.
+    Doctor(McpDoctorArgs),
+
     /// Import server configuration from JSON.
     Import(McpImportArgs),
 
@@ -594,6 +675,21 @@ pub struct McpImportArgs {
     /// Configuration scope.
     #[arg(short = 's', long = "scope", default_value = "local")]
     pub scope: Scope,
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct McpDoctorArgs {
+    /// Output in machine-readable format.
+    #[arg(long)]
+    pub json: bool,
+
+    /// Exit non-zero when any warning or error is found.
+    #[arg(long)]
+    pub strict: bool,
+
+    /// Include network reachability checks when supported.
+    #[arg(long)]
+    pub network: bool,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -1514,6 +1610,54 @@ mod tests {
             _ => false,
         };
         let expected = true;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_mcp_doctor_flags() {
+        let fixture = Cli::parse_from(["forge", "mcp", "doctor", "--json", "--strict"]);
+
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Mcp(mcp)) => match mcp.command {
+                McpCommand::Doctor(args) => (args.json, args.strict),
+                _ => panic!("Expected mcp doctor command"),
+            },
+            _ => panic!("Expected TopLevelCommand::Mcp"),
+        };
+        let expected = (true, true);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_project_scan_flags() {
+        let fixture = Cli::parse_from(["forge", "project", "scan", "--print", "--json"]);
+
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Project(project)) => match project.command {
+                ProjectCommand::Scan(args) => (args.print, args.json),
+            },
+            _ => panic!("Expected TopLevelCommand::Project"),
+        };
+        let expected = (true, true);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_memory_add_with_tag() {
+        let fixture =
+            Cli::parse_from(["forge", "memory", "add", "Prefer cargo check", "--tag", "build"]);
+
+        let actual = match fixture.subcommands {
+            Some(TopLevelCommand::Memory(memory)) => match memory.command {
+                MemoryCommand::Add(args) => (args.text, args.tags),
+                _ => panic!("Expected memory add command"),
+            },
+            _ => panic!("Expected TopLevelCommand::Memory"),
+        };
+        let expected = ("Prefer cargo check".to_string(), vec!["build".to_string()]);
+
         assert_eq!(actual, expected);
     }
 

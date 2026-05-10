@@ -31,8 +31,8 @@ use tokio_stream::StreamExt;
 use url::Url;
 
 use crate::cli::{
-    Cli, CommitCommandGroup, ConversationCommand, ListCommand, McpCommand, SelectCommand,
-    TopLevelCommand,
+    Cli, CommitCommandGroup, ConversationCommand, ListCommand, McpCommand, MemoryCommand,
+    ProjectCommand, SelectCommand, TopLevelCommand,
 };
 use crate::conversation_selector::ConversationSelector;
 use crate::display_constants::{CommandType, headers, markers, status};
@@ -588,6 +588,25 @@ impl<A: API + ConsoleWriter + 'static, F: Fn(ForgeConfig) -> A + Send + Sync> UI
                 return Ok(());
             }
             TopLevelCommand::Mcp(mcp_command) => match mcp_command.command {
+                McpCommand::Doctor(args) => {
+                    let report = self.api.mcp_doctor().await?;
+                    if args.json {
+                        println!("{}", serde_json::to_string_pretty(&report)?);
+                    } else if report.findings.is_empty() {
+                        self.writeln_title(TitleFormat::info("MCP doctor found no issues"))?;
+                    } else {
+                        for finding in &report.findings {
+                            self.writeln_title(TitleFormat::info(format!(
+                                "{} [{:?}]: {}",
+                                finding.server, finding.severity, finding.message
+                            )))?;
+                        }
+                    }
+
+                    if args.strict && report.has_warnings_or_errors() {
+                        return Err(anyhow::anyhow!("MCP doctor found warnings or errors"));
+                    }
+                }
                 McpCommand::Import(import_args) => {
                     let scope: forge_domain::Scope = import_args.scope.into();
 
@@ -669,6 +688,82 @@ impl<A: API + ConsoleWriter + 'static, F: Fn(ForgeConfig) -> A + Send + Sync> UI
                     self.handle_mcp_logout(&args.name).await?;
                 }
             },
+            TopLevelCommand::Project(project_command) => {
+                match project_command.command {
+                    ProjectCommand::Scan(args) => {
+                        let should_write = args.refresh || !args.print;
+                        let profile = self.api.scan_project(should_write).await?;
+                        if args.json {
+                            println!("{}", serde_json::to_string_pretty(&profile)?);
+                        } else {
+                            self.writeln_title(TitleFormat::info(format!(
+                                "Project: {}",
+                                profile.root
+                            )))?;
+                            if !profile.languages.is_empty() {
+                                self.writeln_title(TitleFormat::info(format!(
+                                    "Languages: {}",
+                                    profile.languages.join(", ")
+                                )))?;
+                            }
+                            if !profile.package_managers.is_empty() {
+                                self.writeln_title(TitleFormat::info(format!(
+                                    "Package managers: {}",
+                                    profile.package_managers.join(", ")
+                                )))?;
+                            }
+                            self.writeln_title(TitleFormat::info(format!(
+                                "Commands detected: {}",
+                                profile.commands.len()
+                            )))?;
+                        }
+                    }
+                }
+                return Ok(());
+            }
+            TopLevelCommand::Memory(memory_command) => {
+                match memory_command.command {
+                    MemoryCommand::Add(args) => {
+                        let entry = self.api.add_memory(args.text, args.tags).await?;
+                        self.writeln_title(TitleFormat::info(format!(
+                            "Added memory: {}",
+                            entry.id
+                        )))?;
+                    }
+                    MemoryCommand::List { json } => {
+                        let entries = self.api.list_memory().await?;
+                        if json {
+                            println!("{}", serde_json::to_string_pretty(&entries)?);
+                        } else if entries.is_empty() {
+                            self.writeln_title(TitleFormat::info("No memory entries"))?;
+                        } else {
+                            for entry in entries {
+                                self.writeln_title(TitleFormat::info(format!(
+                                    "{}: {}",
+                                    entry.id, entry.text
+                                )))?;
+                            }
+                        }
+                    }
+                    MemoryCommand::Remove { id } => {
+                        let removed = self.api.remove_memory(&id).await?;
+                        if removed {
+                            self.writeln_title(TitleFormat::info(format!(
+                                "Removed memory: {id}"
+                            )))?;
+                        } else {
+                            self.writeln_title(TitleFormat::info(format!(
+                                "Memory not found: {id}"
+                            )))?;
+                        }
+                    }
+                    MemoryCommand::Clear => {
+                        self.api.clear_memory().await?;
+                        self.writeln_title(TitleFormat::info("Cleared memory"))?;
+                    }
+                }
+                return Ok(());
+            }
             TopLevelCommand::Info { porcelain, conversation_id } => {
                 // Only initialize state (agent/provider/model resolution).
                 // Avoid on_new() which also spawns fire-and-forget background
