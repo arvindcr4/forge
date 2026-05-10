@@ -1646,8 +1646,14 @@ mod tests {
 
     #[test]
     fn test_memory_add_with_tag() {
-        let fixture =
-            Cli::parse_from(["forge", "memory", "add", "Prefer cargo check", "--tag", "build"]);
+        let fixture = Cli::parse_from([
+            "forge",
+            "memory",
+            "add",
+            "Prefer cargo check",
+            "--tag",
+            "build",
+        ]);
 
         let actual = match fixture.subcommands {
             Some(TopLevelCommand::Memory(memory)) => match memory.command {

@@ -347,10 +347,18 @@ mod tests {
         std::fs::write(temp.path().join("Cargo.toml"), "[workspace]\n").unwrap();
         std::fs::write(temp.path().join("package-lock.json"), "{}\n").unwrap();
 
-        let actual = ProjectScanService::new().scan(temp.path(), Vec::new()).unwrap();
+        let actual = ProjectScanService::new()
+            .scan(temp.path(), Vec::new())
+            .unwrap();
 
-        assert_eq!(actual.languages, vec!["Rust".to_string(), "JavaScript".to_string()]);
-        assert_eq!(actual.package_managers, vec!["cargo".to_string(), "npm".to_string()]);
+        assert_eq!(
+            actual.languages,
+            vec!["Rust".to_string(), "JavaScript".to_string()]
+        );
+        assert_eq!(
+            actual.package_managers,
+            vec!["cargo".to_string(), "npm".to_string()]
+        );
     }
 
     #[test]
@@ -375,7 +383,9 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let fixture = MemoryService::new(temp.path());
 
-        let entry = fixture.add("Use cargo check", vec!["workflow".to_string()]).unwrap();
+        let entry = fixture
+            .add("Use cargo check", vec!["workflow".to_string()])
+            .unwrap();
         let after_add = fixture.list().unwrap();
         let removed = fixture.remove(&entry.id).unwrap();
         let after_remove = fixture.list().unwrap();

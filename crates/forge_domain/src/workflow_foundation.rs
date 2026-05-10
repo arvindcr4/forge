@@ -94,7 +94,11 @@ impl ProjectCommandCandidate {
         command: impl Into<String>,
         source: impl Into<String>,
     ) -> Self {
-        Self { kind: kind.into(), command: command.into(), source: source.into() }
+        Self {
+            kind: kind.into(),
+            command: command.into(),
+            source: source.into(),
+        }
     }
 }
 

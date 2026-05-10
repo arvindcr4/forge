@@ -748,9 +748,7 @@ impl<A: API + ConsoleWriter + 'static, F: Fn(ForgeConfig) -> A + Send + Sync> UI
                     MemoryCommand::Remove { id } => {
                         let removed = self.api.remove_memory(&id).await?;
                         if removed {
-                            self.writeln_title(TitleFormat::info(format!(
-                                "Removed memory: {id}"
-                            )))?;
+                            self.writeln_title(TitleFormat::info(format!("Removed memory: {id}")))?;
                         } else {
                             self.writeln_title(TitleFormat::info(format!(
                                 "Memory not found: {id}"
